@@ -2,7 +2,11 @@
 
 #include <memory>
 #include <sys/resource.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <errno.h>
+#include <pwd.h>
+#include <unistd.h>
 #include <Poco/Version.h>
 #include <Poco/DirectoryIterator.h>
 #include <Poco/Net/HTTPServer.h>
@@ -66,6 +70,9 @@ namespace ErrorCodes
     extern const int SUPPORT_IS_DISABLED;
     extern const int ARGUMENT_OUT_OF_BOUND;
     extern const int EXCESSIVE_ELEMENT_IN_CONFIG;
+    extern const int FAILED_TO_STAT_DATA;
+    extern const int FAILED_TO_GETPWUID;
+    extern const int MISMATCHING_USERS_FOR_PROCESS_AND_DATA;
 }
 
 
@@ -77,6 +84,16 @@ static std::string getCanonicalPath(std::string && path)
     if (path.back() != '/')
         path += '/';
     return std::move(path);
+}
+
+static std::string getUserName(uid_t userId) {
+    /// Try to convert user id into user name.
+    const struct passwd * result = getpwuid(userId);
+    if (errno)
+        throwFromErrno("Failed to find user name for " + toString(userId), ErrorCodes::FAILED_TO_GETPWUID);
+    else if (result)
+        return result->pw_name;
+    return toString(userId);
 }
 
 void Server::uninitialize()
@@ -158,6 +175,22 @@ int Server::main(const std::vector<std::string> & /*args*/)
 
     std::string path = getCanonicalPath(config().getString("path"));
     std::string default_database = config().getString("default_database", "default");
+
+    /// Check that the process' user id matches the owner of the data.
+    const auto effectiveUserId = geteuid();
+    struct stat statbuf;
+    if (stat(path.c_str(), &statbuf))
+        throwFromErrno("Failed to stat data path " + path, ErrorCodes::FAILED_TO_STAT_DATA);
+    if (effectiveUserId != statbuf.st_uid)
+    {
+        const auto effectiveUser = getUserName(effectiveUserId);
+        const auto dataOwner = getUserName(statbuf.st_uid);
+        std::string message = "Effective user of the process (" + effectiveUser +
+            ") does not match the owner of the data (" + dataOwner + ").";
+        if (effectiveUserId == 0)
+            message += " Run under 'sudo -u " + dataOwner + "'.";
+        throw Exception(message, ErrorCodes::MISMATCHING_USERS_FOR_PROCESS_AND_DATA);
+    }
 
     global_context->setPath(path);
 

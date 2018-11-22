@@ -396,6 +396,9 @@ namespace ErrorCodes
     extern const int MULTIPLE_ASSIGNMENTS_TO_COLUMN = 419;
     extern const int CANNOT_UPDATE_COLUMN = 420;
     extern const int CANNOT_ADD_DIFFERENT_AGGREGATE_STATES = 421;
+    extern const int FAILED_TO_STAT_DATA = 422;
+    extern const int FAILED_TO_GETPWUID = 423;
+    extern const int MISMATCHING_USERS_FOR_PROCESS_AND_DATA = 424;
 
     extern const int KEEPER_EXCEPTION = 999;
     extern const int POCO_EXCEPTION = 1000;
