@@ -179,8 +179,12 @@ int Server::main(const std::vector<std::string> & /*args*/)
     /// Check that the process' user id matches the owner of the data.
     const auto effectiveUserId = geteuid();
     struct stat statbuf;
-    if (stat(path.c_str(), &statbuf))
-        throwFromErrno("Failed to stat data path " + path, ErrorCodes::FAILED_TO_STAT_DATA);
+    if (stat(path.c_str(), &statbuf)) {
+        const auto parent = path.substr(0, path.find_last_of("/", path.find_last_not_of("/"))); // FIXME: Poco::File should have a function for that
+        if (stat(parent.c_str(), &statbuf)) {
+            throwFromErrno("Failed to stat data path " + parent, ErrorCodes::FAILED_TO_STAT_DATA);
+        }
+    }
     if (effectiveUserId != statbuf.st_uid)
     {
         const auto effectiveUser = getUserName(effectiveUserId);
