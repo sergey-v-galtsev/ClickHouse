@@ -180,7 +180,7 @@ int Server::main(const std::vector<std::string> & /*args*/)
     const auto effectiveUserId = geteuid();
     struct stat statbuf;
     if (stat(path.c_str(), &statbuf)) {
-        const auto parent = path.substr(0, path.find_last_of("/", path.find_last_not_of("/"))); // FIXME: Poco::File should have a function for that
+        const auto parent = Poco::Path(path).parent().toString();
         if (stat(parent.c_str(), &statbuf)) {
             throwFromErrno("Failed to stat data path " + parent, ErrorCodes::FAILED_TO_STAT_DATA);
         }
